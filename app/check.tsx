@@ -1,13 +1,14 @@
 import axios from 'axios';
-import BoxpayCheckout from 'checkout-react-native-sdk';
-import { ConfigurationOptions, PaymentResult } from 'checkout-react-native-sdk/interface';
-import React, { useEffect, useState } from 'react';
+import BoxpayCheckout from 'boxpay-checkout-reactnative-sdk';
+import { ConfigurationOptions, PaymentResultObject } from 'boxpay-checkout-reactnative-sdk/interface';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 const Check = () => {
-  const [token, setToken] = useState<string | null>(null); // Store the token
-  const [shopperToken, setShopperToken] = useState<string | null>(null); // Store the token
-  const [error, setError] = useState<string | null>(null); // Store any error messages
+  const [token, setToken] = useState<string>(""); // Token is initially undefined
+  const [shopperToken, setShopperToken] = useState<string | null>(null);
+  const [error, setError] = useState<string>("");
 
   // Function to fetch the token
   const handleApiCall = async () => {
@@ -32,22 +33,23 @@ const Check = () => {
   }, []);
 
   // Handle payment result from BoxpayCheckout
-  const handlePaymentResult = (result: PaymentResult) => {
+  const handlePaymentResult = (result: PaymentResultObject) => {
     alert(`Payment ${result.status} :  + ${result.transactionId}`);
+    router.navigate('/')
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
       {token ? (
         <BoxpayCheckout
-          token={token}
-          onPaymentResult={handlePaymentResult}
-          configurationOptions={{
-            [ConfigurationOptions.ShowBoxpaySuccessScreen]: true,
-            [ConfigurationOptions.EnableSandboxEnv]: true
-          }}
-          shopperToken={shopperToken}
-        />
+        token={token}
+        onPaymentResult={handlePaymentResult}
+        configurationOptions={{
+          [ConfigurationOptions.ShowBoxpaySuccessScreen]: true,
+          [ConfigurationOptions.EnableSandboxEnv]: true
+        }}
+        shopperToken={shopperToken}
+      />
       ) : (
         <Text style={{ alignSelf: 'center', justifyContent: 'center', paddingTop: 100 }}>{error ? `Error: ${error}` : 'Loading token...'}</Text>
       )}
@@ -76,7 +78,7 @@ const requestBody = {
   context: {
     countryCode: 'IN',
     legalEntity: {
-      code: 'payu',
+      code: 'razorpay',
     },
     orderId: 'test12',
   },

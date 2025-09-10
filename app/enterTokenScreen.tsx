@@ -1,6 +1,7 @@
-import BoxpayCheckout from 'checkout-react-native-sdk';
-import { ConfigurationOptions, PaymentResult } from 'checkout-react-native-sdk/interface';
-import React, { useState } from 'react';
+import BoxpayCheckout from 'boxpay-checkout-reactnative-sdk';
+import { ConfigurationOptions, PaymentResultObject } from 'boxpay-checkout-reactnative-sdk/interface';
+import { router } from 'expo-router';
+import { useState } from 'react';
 import { Button, FlatList, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { TextInput } from 'react-native-paper';
 
@@ -31,8 +32,9 @@ const EnterTokenScreen = () => {
     setToken(tokenTextInput)
   };
 
-  const handlePaymentResult = (result: PaymentResult) => {
+  const handlePaymentResult = (result: PaymentResultObject) => {
     alert(`Payment ${result.status} :  + ${result.transactionId}`);
+    router.back()
   };
 
 
