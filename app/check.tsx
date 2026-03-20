@@ -1,15 +1,42 @@
 import axios from 'axios';
 import BoxpayCheckout from 'boxpay-checkout-reactnative-sdk';
 import { ConfigurationOptions, PaymentResultObject } from 'boxpay-checkout-reactnative-sdk/interface';
-import { router } from 'expo-router';
+import * as Font from 'expo-font';
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const Check = () => {
   const [token, setToken] = useState<string>(""); // Token is initially undefined
   const [shopperToken, setShopperToken] = useState<string | null>(null);
   const [error, setError] = useState<string>("");
+  const [showSDK, setShowSDK] = useState(true);
+  const [fontsLoaded, setFontsLoaded] = useState(false);
 
+  useEffect(() => {
+    const loadFonts = async () => {
+      try {
+        await Font.loadAsync({
+          'NotoSans-Regular':   require('../assets/fonts/NotoSans-Regular.ttf'),
+          'NotoSans-Medium':    require('../assets/fonts/NotoSans-Medium.ttf'),
+          'NotoSans-SemiBold':  require('../assets/fonts/NotoSans-SemiBold.ttf'),
+          'NotoSans-Bold':      require('../assets/fonts/NotoSans-Bold.ttf'),
+          'NotoSans-ExtraBold': require('../assets/fonts/NotoSans-ExtraBold.ttf'),
+        });
+        setFontsLoaded(true); // ✅ fonts ready
+      } catch (e) {
+        setFontsLoaded(true); // still proceed with default fonts
+      }
+    };
+    loadFonts();
+  }, []);
+
+  // 👇 Only fetch token after fonts are loaded
+  useEffect(() => {
+    if (fontsLoaded) {
+      handleApiCall();
+    }
+  }, [fontsLoaded]);
   // Function to fetch the token
   const handleApiCall = async () => {
     try {
@@ -28,32 +55,30 @@ const Check = () => {
 
   };
 
-  useEffect(() => {
-    handleApiCall();  // Call the function to fetch the token when the component mounts
-  }, []);
-
   // Handle payment result from BoxpayCheckout
   const handlePaymentResult = (result: PaymentResultObject) => {
     alert(`Payment ${result.status} :  + ${result.transactionId}`);
-    router.navigate('/')
+    setShowSDK(false)
+    // router.navigate('/')
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'white' }}>
-      {token ? (
+    <SafeAreaView style = {{flex:1}}>
+      {(token && showSDK) ? (
         <BoxpayCheckout
         token={token}
         onPaymentResult={handlePaymentResult}
         configurationOptions={{
           [ConfigurationOptions.ShowBoxpaySuccessScreen]: true,
-          [ConfigurationOptions.EnableSandboxEnv]: true
+          [ConfigurationOptions.EnableSandboxEnv]: true,
+          [ConfigurationOptions.ShowSICheckbox] : true
         }}
         shopperToken={shopperToken}
       />
       ) : (
         <Text style={{ alignSelf: 'center', justifyContent: 'center', paddingTop: 100 }}>{error ? `Error: ${error}` : 'Loading token...'}</Text>
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 

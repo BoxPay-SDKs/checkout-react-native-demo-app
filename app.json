@@ -2,14 +2,22 @@
   "expo": {
     "name": "Boxpay Checkout React Native",
     "slug": "checkout-react-native-demo-app",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/splash-icon.png",
     "scheme": "checkoutreactnativedemoapp",
     "userInterfaceStyle": "automatic",
+    "fonts": [
+      "./assets/fonts/NotoSans-Regular.ttf",
+      "./assets/fonts/NotoSans-Medium.ttf",
+      "./assets/fonts/NotoSans-SemiBold.ttf",
+      "./assets/fonts/NotoSans-Bold.ttf",
+      "./assets/fonts/NotoSans-ExtraBold.ttf"
+    ],
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ishikabansal1601.checkoutreactnativedemoapp"
     },
     "android": {
       "adaptiveIcon": {
@@ -38,6 +46,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9f180349-7bb2-4204-93da-0ad694ed6095"
+      }
     }
   }
 }
