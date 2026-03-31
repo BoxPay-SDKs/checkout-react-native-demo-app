@@ -46,8 +46,9 @@
     "react-native-shimmer-placeholder": ">=2.0.0",
     "react-native-svg": "^15.12.1",
     "react-native-toast-message": "2.0.0",
-    "react-native-web": "~0.20.0",
-    "react-native-webview": "13.13.5"
+    "react-native-webview": "13.13.5",
+    "base-64": "^1.0.0",
+"currency-symbol-map": "^5.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

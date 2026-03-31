@@ -2,7 +2,7 @@ import BoxpayCheckout from 'boxpay-checkout-reactnative-sdk';
 import { ConfigurationOptions, PaymentResultObject, UIConfigurationOptions } from 'boxpay-checkout-reactnative-sdk/interface';
 import * as Font from 'expo-font';
 import { useState } from 'react';
-import { Button, FlatList, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Button, FlatList, InputAccessoryView, Keyboard, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -19,6 +19,18 @@ const EnterTokenScreen = () => {
   const [isFontLoading, setIsFontLoading] = useState(false);
   const [isSICheckboxClicked, setIsSICheckboxClicked] = useState(false)
 
+   // ─── Color state ────────────────────────────────────────────────────────────
+   const [focusedBorderColor, setFocusedBorderColor]     = useState<string | null>(null);
+   const [borderColor, setBorderColor] = useState<string | null>(null);
+   const [isFocusedColorDropdownVisible, setIsFocusedColorDropdownVisible]     = useState(false);
+   const [isUnfocusedColorDropdownVisible, setIsUnfocusedColorDropdownVisible] = useState(false);
+ 
+   // ─── Helpers ─────────────────────────────────────────────────────────────────
+   const getColorLabel = (value: string | null) =>
+     COLOR_OPTIONS.find(c => c.value === value)?.label ?? 'None';
+
+   const inputAccessoryViewID = "checkoutDetailsNumberID";
+
   const loadFonts = async () => {
     try {
       await Font.loadAsync({
@@ -33,6 +45,21 @@ const EnterTokenScreen = () => {
       setFontsLoaded(false)
     }
   };
+
+  const COLOR_OPTIONS = [
+    { label: 'None',        value: null,      hex: 'transparent' },
+    { label: 'Red',         value: '#E53935', hex: '#E53935' },
+    { label: 'Black',       value: '#000000', hex: '#000000' },
+    { label: 'Blue',        value: '#1E88E5', hex: '#1E88E5' },
+    { label: 'Pink',        value: '#E91E8C', hex: '#E91E8C' },
+    { label: 'Purple',      value: '#8E24AA', hex: '#8E24AA' },
+    { label: 'Light Blue',  value: '#29B6F6', hex: '#29B6F6' },
+    { label: 'Green',       value: '#43A047', hex: '#43A047' },
+    { label: 'Orange',      value: '#FB8C00', hex: '#FB8C00' },
+    { label: 'Teal',        value: '#00897B', hex: '#00897B' },
+    { label: 'Indigo',      value: '#3949AB', hex: '#3949AB' },
+    { label: 'Yellow',      value: '#FDD835', hex: '#FDD835' },
+  ];
 
 
   const environments = [
@@ -68,6 +95,93 @@ const EnterTokenScreen = () => {
     // router.navigate('/')
   };
 
+  const textInputFields =
+  focusedBorderColor || borderColor
+      ? {
+          ...(focusedBorderColor   && { focusedBorderColor }),
+          ...(borderColor && { borderColor }),
+        }
+      : null;
+
+  // ─── Reusable color-picker row ───────────────────────────────────────────────
+  const ColorPickerRow = ({
+    label,
+    selected,
+    onSelect,
+    isVisible,
+    setVisible,
+  }: {
+    label: string;
+    selected: string | null;
+    onSelect: (v: string | null) => void;
+    isVisible: boolean;
+    setVisible: (v: boolean) => void;
+  }) => (
+    <View style={styles.colorPickerContainer}>
+      <Text style={styles.label}>{label}</Text>
+      <TouchableOpacity
+        style={styles.colorDropdownButton}
+        onPress={() => setVisible(true)}
+      >
+        {/* Swatch */}
+        <View
+          style={[
+            styles.colorSwatch,
+            {
+              backgroundColor: selected ?? 'transparent',
+              borderWidth: selected ? 0 : 1,
+              borderColor: '#ccc',
+            },
+          ]}
+        />
+        <Text style={styles.colorDropdownText}>{getColorLabel(selected)}</Text>
+        <Text style={styles.dropdownChevron}>▾</Text>
+      </TouchableOpacity>
+
+      <Modal visible={isVisible} animationType="fade" transparent>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setVisible(false)}
+        >
+          <View style={styles.colorModalContent}>
+            <Text style={styles.colorModalTitle}>{label}</Text>
+            <FlatList
+              data={COLOR_OPTIONS}
+              keyExtractor={item => item.label}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.colorItem,
+                    selected === item.value && styles.colorItemSelected,
+                  ]}
+                  onPress={() => {
+                    onSelect(item.value);
+                    setVisible(false);
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.colorSwatch,
+                      {
+                        backgroundColor: item.hex,
+                        borderWidth: item.value === null ? 1 : 0,
+                        borderColor: '#ccc',
+                      },
+                    ]}
+                  />
+                  <Text style={styles.colorItemLabel}>{item.label}</Text>
+                  {selected === item.value && (
+                    <Text style={styles.colorItemCheck}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
@@ -92,7 +206,10 @@ const EnterTokenScreen = () => {
               extraBold: 'NotoSans-ExtraBold'
             },
           }),
-          [UIConfigurationOptions.CTABorderRadius]: Number(ctaBorderRadius)
+          [UIConfigurationOptions.CTABorderRadius]: Number(ctaBorderRadius),
+          ...(textInputFields && {
+            [UIConfigurationOptions.TextInputFields]: textInputFields,
+          })
         }}
         onPaymentResult={handlePaymentResult}
         shopperToken={shopperToken}
@@ -107,6 +224,7 @@ const EnterTokenScreen = () => {
             onChangeText={(it) => {
               setTokenTextInput(it);
             }}
+            inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
             style={styles.textInput}
           />
           <TextInput
@@ -116,6 +234,7 @@ const EnterTokenScreen = () => {
             onChangeText={(it) => {
               setShopperTokenTextInput(it);
             }}
+            inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
             style={styles.textInput}
           />
 
@@ -125,6 +244,7 @@ const EnterTokenScreen = () => {
             value={ctaBorderRadius}
             onChangeText={(val) => setCtaBorderRadius(val.replace(/[^0-9]/g, ''))}
             keyboardType="numeric"
+            inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
             style={styles.textInput}
           />
 
@@ -155,10 +275,10 @@ const EnterTokenScreen = () => {
             {useNotoSans && (
   <View style={styles.fontStatusRow}>
     {isFontLoading ? (
-      <>
+      <View>
         <ActivityIndicator size="small" color="#007bff" />
         <Text style={styles.fontStatus}>  Loading Noto Sans...</Text>
-      </>
+      </View>
     ) : fontsLoaded ? (
       <Text style={styles.fontStatus}>✅ Noto Sans loaded</Text>
     ) : null}
@@ -173,6 +293,22 @@ const EnterTokenScreen = () => {
               {environments.find((env) => env.value === environment)?.label || "Select Environment"}
             </Text>
           </TouchableOpacity>
+
+          {/* ── Color pickers ── */}
+          <ColorPickerRow
+            label="Text Input Focused Color:"
+            selected={focusedBorderColor}
+            onSelect={setFocusedBorderColor}
+            isVisible={isFocusedColorDropdownVisible}
+            setVisible={setIsFocusedColorDropdownVisible}
+          />
+          <ColorPickerRow
+            label="Text Input Unfocused Color:"
+            selected={borderColor}
+            onSelect={setBorderColor}
+            isVisible={isUnfocusedColorDropdownVisible}
+            setVisible={setIsUnfocusedColorDropdownVisible}
+          />
 
           <View
               style={styles.checkBoxContainer}
@@ -220,6 +356,19 @@ const EnterTokenScreen = () => {
               </View>
             </View>
           </Modal>
+          {Platform.OS === 'ios' && (
+          <InputAccessoryView nativeID={inputAccessoryViewID}>
+            <View style={{
+              backgroundColor: '#f1f1f1',
+              padding: 10,
+              alignItems: 'flex-end',
+            }}>
+              <TouchableOpacity onPress={() => Keyboard.dismiss()}>
+                <Text style={{ fontSize: 16 }}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </InputAccessoryView>
+      )}
         </View>
       )}
     </View>
@@ -362,6 +511,17 @@ checkBoxText : {
   color: '#2D2B32',
   fontSize: 14,
   marginLeft: 6,
-}
+},
+colorPickerContainer:  { width: '100%', marginBottom: 12 },
+  colorDropdownButton:   { flexDirection: 'row', alignItems: 'center', width: '100%', borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, backgroundColor: 'white', gap: 10 },
+  colorDropdownText:     { flex: 1, fontSize: 15 },
+  dropdownChevron:       { fontSize: 14, color: '#555' },
+  colorSwatch:           { width: 22, height: 22, borderRadius: 4 },
+  colorModalContent:     { backgroundColor: 'white', borderRadius: 12, width: '80%', maxHeight: '60%', padding: 16 },
+  colorModalTitle:       { fontSize: 16, fontWeight: '600', marginBottom: 10 },
+  colorItem:             { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4, gap: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  colorItemSelected:     { backgroundColor: '#f0f6ff' },
+  colorItemLabel:        { flex: 1, fontSize: 15 },
+  colorItemCheck:        { fontSize: 16, color: '#007bff', fontWeight: 'bold' },
 
 });
