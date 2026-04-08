@@ -2,7 +2,7 @@ import BoxpayCheckout from 'boxpay-checkout-reactnative-sdk';
 import { ConfigurationOptions, PaymentResultObject, UIConfigurationOptions } from 'boxpay-checkout-reactnative-sdk/interface';
 import * as Font from 'expo-font';
 import { useState } from 'react';
-import { Button, FlatList, InputAccessoryView, Keyboard, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Button, FlatList, InputAccessoryView, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,6 +18,8 @@ const EnterTokenScreen = () => {
   const [ctaBorderRadius, setCtaBorderRadius] = useState(""); 
   const [isFontLoading, setIsFontLoading] = useState(false);
   const [isSICheckboxClicked, setIsSICheckboxClicked] = useState(false)
+  const [showSuccessScreen, setShowSuccessScreen] = useState(true);
+  const [showFailureScreen, setShowFailureScreen] = useState(true);
 
    // ─── Color state ────────────────────────────────────────────────────────────
    const [focusedBorderColor, setFocusedBorderColor]     = useState<string | null>(null);
@@ -192,9 +194,10 @@ const EnterTokenScreen = () => {
         key={token}
         token={token}
         configurationOptions={{
-          [ConfigurationOptions.ShowBoxpaySuccessScreen]: true,
+          [ConfigurationOptions.ShowBoxpaySuccessScreen]: showSuccessScreen,
           [ConfigurationOptions.EnableSandboxEnv]: environment == "test",
-          [ConfigurationOptions.ShowSICheckbox] : isSICheckboxClicked
+          [ConfigurationOptions.ShowSICheckbox]: isSICheckboxClicked,
+          [ConfigurationOptions.ShowBoxpayFailedScreen]: showFailureScreen
         }}
         uiConfiguration={{
           ...(useNotoSans && {
@@ -216,6 +219,11 @@ const EnterTokenScreen = () => {
       />
         </SafeAreaView>
       ) : (
+        <ScrollView 
+        style={{ flex: 1 }} 
+        contentContainerStyle={{ paddingBottom: 40, paddingTop: 60 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.container}>
           <TextInput
             mode="outlined"
@@ -247,6 +255,46 @@ const EnterTokenScreen = () => {
             inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
             style={styles.textInput}
           />
+
+          {/* Success Screen Checkbox */}
+<View style={styles.checkBoxContainer}>
+  <TouchableOpacity
+    onPress={() => setShowSuccessScreen(!showSuccessScreen)}
+  >
+    <View style={[
+      styles.checkboxBox,
+      { borderColor: "#007bff" },
+      showSuccessScreen && { backgroundColor: "#007bff" }
+    ]}>
+      {showSuccessScreen && (
+        <Text style={styles.checkmark}>✓</Text>
+      )}
+    </View>
+  </TouchableOpacity>
+  <Text style={styles.checkBoxText}>
+    Show Success Screen
+  </Text>
+</View>
+
+{/* Failure Screen Checkbox */}
+<View style={styles.checkBoxContainer}>
+  <TouchableOpacity
+    onPress={() => setShowFailureScreen(!showFailureScreen)}
+  >
+    <View style={[
+      styles.checkboxBox,
+      { borderColor: "#007bff" },
+      showFailureScreen && { backgroundColor: "#007bff" }
+    ]}>
+      {showFailureScreen && (
+        <Text style={styles.checkmark}>✓</Text>
+      )}
+    </View>
+  </TouchableOpacity>
+  <Text style={styles.checkBoxText}>
+    Show Failure Screen
+  </Text>
+</View>
 
 
 <View style={styles.radioContainer}>
@@ -331,7 +379,7 @@ const EnterTokenScreen = () => {
               >
                 Show SI checkbox in checkout.
               </Text>
-              </View>
+          </View>
 
           <Pressable style={styles.proceedButton} onPress={handleProceedPress}>
             <Text style={styles.proceedButtonText}>Proceed</Text>
@@ -370,6 +418,7 @@ const EnterTokenScreen = () => {
           </InputAccessoryView>
       )}
         </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -393,6 +442,7 @@ const styles = StyleSheet.create({
   radioContainer: {
     width: '100%',
     marginBottom: 12,
+    paddingTop: 10,
   },
   radioRow: {
     flexDirection: 'row',
