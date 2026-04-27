@@ -57,7 +57,7 @@ const Check = () => {
 
   // Handle payment result from BoxpayCheckout
   const handlePaymentResult = (result: PaymentResultObject) => {
-    alert(`Payment ${result.status} :  + ${result.transactionId}`);
+    alert(`Payment ${result.status} :  + ${result.transactionId} + ${result.inquiryToken}`);
     setShowSDK(false)
     // router.navigate('/')
   };
@@ -70,8 +70,7 @@ const Check = () => {
         onPaymentResult={handlePaymentResult}
         configurationOptions={{
           [ConfigurationOptions.ShowBoxpaySuccessScreen]: true,
-          [ConfigurationOptions.EnableSandboxEnv]: true,
-          [ConfigurationOptions.ShowSICheckbox] : true
+          [ConfigurationOptions.EnableSandboxEnv]: true
         }}
         shopperToken={shopperToken}
       />

@@ -1,5 +1,5 @@
 import BoxpayCheckout from 'boxpay-checkout-reactnative-sdk';
-import { ConfigurationOptions, PaymentResultObject, UIConfigurationOptions } from 'boxpay-checkout-reactnative-sdk/interface';
+import { ConfigurationOptions, PaymentResultObject, SICheckboxState, UIConfigurationOptions } from 'boxpay-checkout-reactnative-sdk/interface';
 import * as Font from 'expo-font';
 import { useState } from 'react';
 import { Button, FlatList, InputAccessoryView, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -17,8 +17,8 @@ const EnterTokenScreen = () => {
   const [useNotoSans, setUseNotoSans] = useState(false);       // ← radio button state
   const [ctaBorderRadius, setCtaBorderRadius] = useState(""); 
   const [isFontLoading, setIsFontLoading] = useState(false);
-  const [isSICheckboxClicked, setIsSICheckboxClicked] = useState(false)
-  const [showSuccessScreen, setShowSuccessScreen] = useState(true);
+  const [siCheckboxState, setSICheckboxState] = useState<SICheckboxState | null>(null);
+  const [isSIDropdownVisible, setIsSIDropdownVisible] = useState(false);  const [showSuccessScreen, setShowSuccessScreen] = useState(true);
   const [showFailureScreen, setShowFailureScreen] = useState(true);
 
    // ─── Color state ────────────────────────────────────────────────────────────
@@ -31,7 +31,17 @@ const EnterTokenScreen = () => {
    const getColorLabel = (value: string | null) =>
      COLOR_OPTIONS.find(c => c.value === value)?.label ?? 'None';
 
-   const inputAccessoryViewID = "checkoutDetailsNumberID";
+   const SI_CHECKBOX_OPTIONS = [
+    { label: "None", value: null },
+    { label: "Checked & Enabled", value: SICheckboxState.CHECKED_AND_ENABLED },
+    { label: "Checked & Disabled", value: SICheckboxState.CHECKED_AND_DISABLED },
+    { label: "Unchecked & Enabled", value: SICheckboxState.UNCHECKED_AND_ENABLED },
+  ];
+
+  const getSILabel = (value: SICheckboxState | null) =>
+    SI_CHECKBOX_OPTIONS.find(opt => opt.value === value)?.label || "None";
+
+  const inputAccessoryViewID = "checkoutDetailsNumberID";
 
   const loadFonts = async () => {
     try {
@@ -92,7 +102,7 @@ const EnterTokenScreen = () => {
   };
 
   const handlePaymentResult = (result: PaymentResultObject) => {
-    alert(`Payment ${result.status} :  + ${result.transactionId}`);
+    alert(`Payment ${result.status} :  + ${result.transactionId} + ${result.inquiryToken}`);
     setToken("")
     // router.navigate('/')
   };
@@ -196,7 +206,7 @@ const EnterTokenScreen = () => {
         configurationOptions={{
           [ConfigurationOptions.ShowBoxpaySuccessScreen]: showSuccessScreen,
           [ConfigurationOptions.EnableSandboxEnv]: environment == "test",
-          [ConfigurationOptions.ShowSICheckbox]: isSICheckboxClicked,
+          [ConfigurationOptions.SICheckBoxState]: siCheckboxState,
           [ConfigurationOptions.ShowBoxpayFailedScreen]: showFailureScreen
         }}
         uiConfiguration={{
@@ -358,29 +368,37 @@ const EnterTokenScreen = () => {
             setVisible={setIsUnfocusedColorDropdownVisible}
           />
 
-          <View
-              style={styles.checkBoxContainer}
-            >
-              <TouchableOpacity
-                onPress={() => setIsSICheckboxClicked(!isSICheckboxClicked)}
-              >
-                <View style={[
-                  styles.checkboxBox,
-                  { borderColor: "#007bff" },
-                  isSICheckboxClicked && { backgroundColor: "#007bff" }
-                ]}>
-                  {isSICheckboxClicked && (
-                    <Text style={styles.checkmark}>✓</Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-              <Text
-                style={[styles.checkBoxText]}
-              >
-                Show SI checkbox in checkout.
-              </Text>
-          </View>
+<Text style={styles.label}>SI Checkbox State:</Text>
 
+<TouchableOpacity
+  style={styles.dropdownButton}
+  onPress={() => setIsSIDropdownVisible(true)}
+>
+  <Text>{getSILabel(siCheckboxState)}</Text>
+</TouchableOpacity>
+
+<Modal visible={isSIDropdownVisible} animationType="slide" transparent>
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalContent}>
+      <FlatList
+        data={SI_CHECKBOX_OPTIONS}
+        keyExtractor={(item) => item.label}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.dropdownItem}
+            onPress={() => {
+              setSICheckboxState(item.value);
+              setIsSIDropdownVisible(false);
+            }}
+          >
+            <Text>{item.label}</Text>
+          </TouchableOpacity>
+        )}
+      />
+      <Button title="Close" onPress={() => setIsSIDropdownVisible(false)} />
+    </View>
+  </View>
+</Modal>
           <Pressable style={styles.proceedButton} onPress={handleProceedPress}>
             <Text style={styles.proceedButtonText}>Proceed</Text>
           </Pressable>
