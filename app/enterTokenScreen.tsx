@@ -1,141 +1,100 @@
-import BoxpayCheckout from 'boxpay-checkout-reactnative-sdk';
-import { ConfigurationOptions, PaymentResultObject, SICheckboxState, UIConfigurationOptions } from 'boxpay-checkout-reactnative-sdk/interface';
-import * as Font from 'expo-font';
-import { useState } from 'react';
-import { Button, FlatList, InputAccessoryView, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { ActivityIndicator, TextInput } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { BoxpayCheckout } from 'boxpay-checkout-reactnative-sdk';
+import {
+  ConfigurationOptions,
+  PaymentResultObject,
+  SICheckboxState,
+  UIConfigurationOptions,
+} from 'boxpay-checkout-reactnative-sdk/interface';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { TextInput } from 'react-native-paper';
+import Toast from 'react-native-toast-message';
 
-const EnterTokenScreen = () => {
-  const [tokenTextInput, setTokenTextInput] = useState("");
-  const [shopperTokenTextInput, setShopperTokenTextInput] = useState("");
-  const [environment, setEnvironment] = useState("test");
-  const [isDropdownVisible, setIsDropdownVisible] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
-  const [shopperToken, setShopperToken] = useState<string | null>(null);
-  const [fontsLoaded, setFontsLoaded] = useState(false);
-  const [useNotoSans, setUseNotoSans] = useState(false);       // ← radio button state
-  const [ctaBorderRadius, setCtaBorderRadius] = useState(""); 
-  const [isFontLoading, setIsFontLoading] = useState(false);
-  const [siCheckboxState, setSICheckboxState] = useState<SICheckboxState | null>(null);
-  const [isSIDropdownVisible, setIsSIDropdownVisible] = useState(false);  const [showSuccessScreen, setShowSuccessScreen] = useState(true);
-  const [showFailureScreen, setShowFailureScreen] = useState(true);
+// ── Constants (mirrors TokenScreen.kt) ───────────────────────────────────────
 
-   // ─── Color state ────────────────────────────────────────────────────────────
-   const [focusedBorderColor, setFocusedBorderColor]     = useState<string | null>(null);
-   const [borderColor, setBorderColor] = useState<string | null>(null);
-   const [isFocusedColorDropdownVisible, setIsFocusedColorDropdownVisible]     = useState(false);
-   const [isUnfocusedColorDropdownVisible, setIsUnfocusedColorDropdownVisible] = useState(false);
- 
-   // ─── Helpers ─────────────────────────────────────────────────────────────────
-   const getColorLabel = (value: string | null) =>
-     COLOR_OPTIONS.find(c => c.value === value)?.label ?? 'None';
+const PRESET_COLORS: { label: string; value: string | null }[] = [
+  { label: 'None', value: null },
+  { label: 'Charcoal', value: '#2D2B32' },
+  { label: 'Grey', value: '#ADACB0' },
+  { label: 'Black', value: '#000000' },
+  { label: 'Blue', value: '#1A73E8' },
+  { label: 'Green', value: '#1CA672' },
+  { label: 'Red', value: '#E53935' },
+  { label: 'Purple', value: '#7B1FA2' },
+];
 
-   const SI_CHECKBOX_OPTIONS = [
-    { label: "None", value: null },
-    { label: "Checked & Enabled", value: SICheckboxState.CHECKED_AND_ENABLED },
-    { label: "Checked & Disabled", value: SICheckboxState.CHECKED_AND_DISABLED },
-    { label: "Unchecked & Enabled", value: SICheckboxState.UNCHECKED_AND_ENABLED },
-  ];
+const PAYMENT_METHODS = ['UPI', 'CARDS', 'WALLET', 'NETBANKING', 'BUYNOWPAYLATER', 'EMI'];
 
-  const getSILabel = (value: SICheckboxState | null) =>
-    SI_CHECKBOX_OPTIONS.find(opt => opt.value === value)?.label || "None";
+const FONT_FAMILY_OPTIONS: { label: string; value: string }[] = [
+  { label: 'None', value: '' },
+  { label: 'Default', value: 'poppins' },
+  { label: 'Arial', value: 'arial' },
+  { label: 'NotoSans', value: 'notosans' },
+];
 
-  const inputAccessoryViewID = "checkoutDetailsNumberID";
+const PRIMARY_GREEN = '#1CA672';
+const DISABLED_GREY = '#E6E6E6';
+const DISABLED_TEXT = '#ADACAD';
+const TEXT_DARK = '#0A090B';
+const LABEL_DARK = '#2D2B32';
 
-  const loadFonts = async () => {
-    try {
-      await Font.loadAsync({
-        'NotoSans-Regular':   require('../assets/fonts/NotoSans-Regular.ttf'),
-        'NotoSans-Medium':    require('../assets/fonts/NotoSans-Medium.ttf'),
-        'NotoSans-SemiBold':  require('../assets/fonts/NotoSans-SemiBold.ttf'),
-        'NotoSans-Bold':      require('../assets/fonts/NotoSans-Bold.ttf'),
-        'NotoSans-ExtraBold': require('../assets/fonts/NotoSans-ExtraBold.ttf'),
-      });
-      setFontsLoaded(true)
-    } catch (e) {
-      setFontsLoaded(false)
-    }
-  };
+const inputAccessoryViewID = 'checkoutDetailsNumberID';
 
-  const COLOR_OPTIONS = [
-    { label: 'None',        value: null,      hex: 'transparent' },
-    { label: 'Red',         value: '#E53935', hex: '#E53935' },
-    { label: 'Black',       value: '#000000', hex: '#000000' },
-    { label: 'Blue',        value: '#1E88E5', hex: '#1E88E5' },
-    { label: 'Pink',        value: '#E91E8C', hex: '#E91E8C' },
-    { label: 'Purple',      value: '#8E24AA', hex: '#8E24AA' },
-    { label: 'Light Blue',  value: '#29B6F6', hex: '#29B6F6' },
-    { label: 'Green',       value: '#43A047', hex: '#43A047' },
-    { label: 'Orange',      value: '#FB8C00', hex: '#FB8C00' },
-    { label: 'Teal',        value: '#00897B', hex: '#00897B' },
-    { label: 'Indigo',      value: '#3949AB', hex: '#3949AB' },
-    { label: 'Yellow',      value: '#FDD835', hex: '#FDD835' },
-  ];
+// ── Reusable UI pieces ────────────────────────────────────────────────────────
 
+const ToggleRow = ({
+  label,
+  value,
+  onValueChange,
+}: {
+  label: string;
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+}) => (
+  <View style={styles.toggleRow}>
+    <Text style={styles.toggleLabel}>{label}</Text>
+    <Switch
+      value={value}
+      onValueChange={onValueChange}
+      trackColor={{ false: '#D9D9D9', true: PRIMARY_GREEN }}
+      thumbColor="#ffffff"
+    />
+  </View>
+);
 
-  const environments = [
-    { label: "Test", value: "test" },
-    { label: "Production", value: "prod" },
-  ];
+const ColorPickerField = ({
+  label,
+  selected,
+  onChange,
+}: {
+  label: string;
+  selected: string | null;
+  onChange: (v: string | null) => void;
+}) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [customHex, setCustomHex] = useState('');
+  const isCustom = selected !== null && !PRESET_COLORS.some((c) => c.value === selected);
 
-  const toggleDropdown = () => {
-    setIsDropdownVisible(!isDropdownVisible);
-  };
+  const selectedLabel = isCustom
+    ? 'Custom'
+    : PRESET_COLORS.find((c) => c.value === selected)?.label ?? 'None';
 
-  const selectEnvironment = (value: string) => {
-    setEnvironment(value);
-    setIsDropdownVisible(false);
-  };
+  return (
+    <View style={styles.fieldContainer}>
+      <Text style={styles.fieldLabel}>{label}</Text>
 
-  const handleProceedPress = () => {
-    setShopperToken(shopperTokenTextInput)
-    setToken(tokenTextInput)
-  };
-  const handleNotoSansToggle = async (value: boolean) => {
-    if (value && !fontsLoaded) {
-      setIsFontLoading(true);        // ← show loader
-      await loadFonts();
-      setIsFontLoading(false);       // ← hide loader
-    }
-    setUseNotoSans(value);
-  };
-
-  const handlePaymentResult = (result: PaymentResultObject) => {
-    alert(`Payment ${result.status} :  + ${result.transactionId} + ${result.inquiryToken}`);
-    setToken("")
-    // router.navigate('/')
-  };
-
-  const textInputFields =
-  focusedBorderColor || borderColor
-      ? {
-          ...(focusedBorderColor   && { focusedBorderColor }),
-          ...(borderColor && { borderColor }),
-        }
-      : null;
-
-  // ─── Reusable color-picker row ───────────────────────────────────────────────
-  const ColorPickerRow = ({
-    label,
-    selected,
-    onSelect,
-    isVisible,
-    setVisible,
-  }: {
-    label: string;
-    selected: string | null;
-    onSelect: (v: string | null) => void;
-    isVisible: boolean;
-    setVisible: (v: boolean) => void;
-  }) => (
-    <View style={styles.colorPickerContainer}>
-      <Text style={styles.label}>{label}</Text>
-      <TouchableOpacity
-        style={styles.colorDropdownButton}
-        onPress={() => setVisible(true)}
-      >
-        {/* Swatch */}
+      <TouchableOpacity style={styles.dropdownButton} onPress={() => setIsVisible(true)}>
         <View
           style={[
             styles.colorSwatch,
@@ -146,20 +105,27 @@ const EnterTokenScreen = () => {
             },
           ]}
         />
-        <Text style={styles.colorDropdownText}>{getColorLabel(selected)}</Text>
+        <Text style={styles.dropdownButtonText}>{selectedLabel}</Text>
         <Text style={styles.dropdownChevron}>▾</Text>
       </TouchableOpacity>
 
+      {isCustom && (
+        <TextInput
+          mode="outlined"
+          label="Hex value"
+          value={selected ?? ''}
+          onChangeText={(v) => onChange(v.startsWith('#') ? v : `#${v}`)}
+          style={styles.textInput}
+        />
+      )}
+
       <Modal visible={isVisible} animationType="fade" transparent>
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setVisible(false)}
-        >
+        <Pressable style={styles.modalOverlay} onPress={() => setIsVisible(false)}>
           <View style={styles.colorModalContent}>
             <Text style={styles.colorModalTitle}>{label}</Text>
             <FlatList
-              data={COLOR_OPTIONS}
-              keyExtractor={item => item.label}
+              data={[...PRESET_COLORS, { label: 'Custom', value: customHex || '#000000' }]}
+              keyExtractor={(item) => item.label}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
@@ -167,95 +133,257 @@ const EnterTokenScreen = () => {
                     selected === item.value && styles.colorItemSelected,
                   ]}
                   onPress={() => {
-                    onSelect(item.value);
-                    setVisible(false);
+                    onChange(item.value);
+                    setIsVisible(false);
                   }}
                 >
                   <View
                     style={[
                       styles.colorSwatch,
                       {
-                        backgroundColor: item.hex,
-                        borderWidth: item.value === null ? 1 : 0,
+                        backgroundColor: item.value ?? 'transparent',
+                        borderWidth: item.value ? 0 : 1,
                         borderColor: '#ccc',
                       },
                     ]}
                   />
                   <Text style={styles.colorItemLabel}>{item.label}</Text>
-                  {selected === item.value && (
-                    <Text style={styles.colorItemCheck}>✓</Text>
+                  {item.value && item.label !== 'Custom' && (
+                    <Text style={styles.colorItemHex}>{item.value}</Text>
                   )}
                 </TouchableOpacity>
               )}
             />
+            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setIsVisible(false)}>
+              <Text style={styles.modalCloseButtonText}>Close</Text>
+            </TouchableOpacity>
           </View>
         </Pressable>
       </Modal>
     </View>
   );
+};
 
+const PaymentMethodsField = ({
+  selected,
+  onChange,
+}: {
+  selected: Set<string>;
+  onChange: (v: Set<string>) => void;
+}) => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  const displayText =
+    selected.size === 0 ? 'All Payment Methods (Checkout)' : Array.from(selected).join(', ');
+
+  const toggleMethod = (method: string) => {
+    const updated = new Set(selected);
+    if (updated.has(method)) {
+      updated.delete(method);
+    } else {
+      updated.add(method);
+    }
+    onChange(updated);
+  };
+
+  return (
+    <View style={styles.fieldContainer}>
+      <Text style={styles.fieldLabel}>Payment Methods</Text>
+      <TouchableOpacity style={styles.dropdownButton} onPress={() => setIsVisible(true)}>
+        <Text style={styles.dropdownButtonText} numberOfLines={1}>
+          {displayText}
+        </Text>
+        <Text style={styles.dropdownChevron}>▾</Text>
+      </TouchableOpacity>
+
+      <Modal visible={isVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <FlatList
+              data={PAYMENT_METHODS}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => {
+                const isSelected = selected.has(item);
+                return (
+                  <TouchableOpacity style={styles.checkboxRow} onPress={() => toggleMethod(item)}>
+                    <View
+                      style={[
+                        styles.checkboxBox,
+                        { borderColor: PRIMARY_GREEN },
+                        isSelected && { backgroundColor: PRIMARY_GREEN },
+                      ]}
+                    >
+                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                    <Text style={styles.dropdownItemText}>{item}</Text>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setIsVisible(false)}>
+              <Text style={styles.modalCloseButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+
+const EnterTokenScreen = () => {
+  // Token fields
+  const [tokenTextInput, setTokenTextInput] = useState('');
+  const [shopperTokenTextInput, setShopperTokenTextInput] = useState('');
+  const [token, setToken] = useState<string | null>(null);
+  const [shopperToken, setShopperToken] = useState<string | null>(null);
+
+  // Colors
+  const [focusedTextInputBorderColor, setFocusedBorderColor] = useState<string | null>('#2D2B32');
+  const [unfocusedTextInputBorderColor, setUnfocusedBorderColor] = useState<string | null>('#ADACB0');
+
+  // CTA border radius
+  const [ctaBorderRadius, setCtaBorderRadius] = useState('0');
+
+  // Payment methods
+  const [paymentMethods, setPaymentMethods] = useState<Set<string>>(new Set());
+
+  // Font family
+  const [fontFamily, setFontFamily] = useState('');
+  const [isFontDropdownVisible, setIsFontDropdownVisible] = useState(false);
+
+  // Toggles
+  const [isTestEnv, setIsTestEnv] = useState(true);
+  const [isBoxPayPayButtonVisible, setIsBoxPayPayButtonVisible] = useState(false);
+  const [showSuccessScreen, setShowSuccessScreen] = useState(false);
+  const [showFailureScreen, setShowFailureScreen] = useState(false);
+  const [showQROnLoad, setShowQROnLoad] = useState(false);
+  const [isSICheckBoxEnabled, setIsSICheckBoxEnabled] = useState(false);
+  const [isSICheckBoxChecked, setIsSICheckBoxChecked] = useState(false);
+
+
+  const handleFontFamilySelect = async (value: string) => {
+    setFontFamily(value);
+    setIsFontDropdownVisible(false);
+  };
+
+  const handleProceedPress = () => {
+    if (!tokenTextInput) return;
+    setShopperToken(shopperTokenTextInput);
+    setToken(tokenTextInput);
+  };
+
+  const handlePaymentResult = useCallback(
+    (result: PaymentResultObject) => {
+      console.log('Payment Result:', result);
+  
+      // Close first — this must always happen, independent of anything below
+      setToken(null);
+  
+      try {
+        const status = typeof result?.status === 'string' ? result.status : String(result?.status ?? '');
+        const transactionId = result?.transactionId ?? '';
+  
+        Toast.show({
+          type: status.toLowerCase() === 'success' ? 'success' : 'error',
+          text1: `Payment ${status}`,
+          text2: `Transaction ID: ${transactionId}`,
+          position: 'top',
+          visibilityTime: 4000,
+        });
+      } catch (err) {
+        console.error('Toast display failed:', err);
+      }
+    },
+    [],
+  );
+
+  // Map the two SI booleans (enabled / pre-checked) onto the SDK's SICheckboxState enum,
+  // the same way TokenScreen.kt derives its four states.
+  const siCheckboxState = useMemo<SICheckboxState | null>(() => {
+    if (isSICheckBoxEnabled && isSICheckBoxChecked) return SICheckboxState.CHECKED_AND_ENABLED;
+    if (isSICheckBoxEnabled && !isSICheckBoxChecked) return SICheckboxState.UNCHECKED_AND_ENABLED;
+    if (!isSICheckBoxEnabled && isSICheckBoxChecked) return SICheckboxState.CHECKED_AND_DISABLED;
+    return null;
+  }, [isSICheckBoxEnabled, isSICheckBoxChecked]);
+
+  const textInputFields =
+  focusedTextInputBorderColor || unfocusedTextInputBorderColor
+      ? {
+          ...(focusedTextInputBorderColor && { focusedTextInputBorderColor }),
+          ...(unfocusedTextInputBorderColor && { borderColor: unfocusedTextInputBorderColor }),
+        }
+      : null;
+
+  const fontFamilyLabel =
+    FONT_FAMILY_OPTIONS.find((f) => f.value === fontFamily)?.label ?? 'None';
+
+  const isProceedEnabled = tokenTextInput.trim().length > 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
       {token ? (
-        <SafeAreaView style = {{flex :1}}>
-
-        <BoxpayCheckout
-        key={token}
-        token={token}
-        configurationOptions={{
-          [ConfigurationOptions.ShowBoxpaySuccessScreen]: showSuccessScreen,
-          [ConfigurationOptions.EnableSandboxEnv]: environment == "test",
-          [ConfigurationOptions.SICheckBoxState]: siCheckboxState,
-          [ConfigurationOptions.ShowBoxpayFailedScreen]: showFailureScreen
-        }}
-        uiConfiguration={{
-          ...(useNotoSans && {
-            [UIConfigurationOptions.FontFamily]: {
-              regular:   'NotoSans-Regular',
-              medium:    'NotoSans-Medium',
-              semiBold:  'NotoSans-SemiBold',
-              bold:      'NotoSans-Bold',
-              extraBold: 'NotoSans-ExtraBold'
-            },
-          }),
-          [UIConfigurationOptions.CTABorderRadius]: Number(ctaBorderRadius),
-          ...(textInputFields && {
-            [UIConfigurationOptions.TextInputFields]: textInputFields,
-          })
-        }}
-        onPaymentResult={handlePaymentResult}
-        shopperToken={shopperToken}
-      />
-        </SafeAreaView>
+        <View style={{ flex: 1 , paddingTop :170}}>
+           <BoxpayCheckout
+            key={token}
+            token={token}
+            configurationOptions={{
+              [ConfigurationOptions.ShowBoxpaySuccessScreen]: showSuccessScreen,
+              [ConfigurationOptions.EnableSandboxEnv]: isTestEnv,
+              [ConfigurationOptions.SICheckBoxState]: siCheckboxState,
+              [ConfigurationOptions.ShowBoxpayFailedScreen]: showFailureScreen,
+            }}
+            uiConfiguration={{
+              [UIConfigurationOptions.FontFamily]: fontFamily,
+              [UIConfigurationOptions.CTABorderRadius]: Number(ctaBorderRadius) || 0,
+              ...(textInputFields && {
+                [UIConfigurationOptions.TextInputFields]: textInputFields,
+              }),
+            }}
+            onPaymentResult={handlePaymentResult}
+            shopperToken={shopperToken}
+          />
+        </View>
       ) : (
-        <ScrollView 
-        style={{ flex: 1 }} 
-        contentContainerStyle={{ paddingBottom: 40, paddingTop: 60 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.container}>
+        <ScrollView
+          style={{ flex: 1, }}
+          contentContainerStyle={{ paddingBottom: 40, paddingTop: 70, paddingHorizontal: 16 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* ── Token ── */}
           <TextInput
             mode="outlined"
-            label="Enter Token"
+            label="Token *"
             value={tokenTextInput}
-            onChangeText={(it) => {
-              setTokenTextInput(it);
-            }}
-            inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
-            style={styles.textInput}
-          />
-          <TextInput
-            mode="outlined"
-            label="Enter Shopper Token"
-            value={shopperTokenTextInput}
-            onChangeText={(it) => {
-              setShopperTokenTextInput(it);
-            }}
+            onChangeText={setTokenTextInput}
             inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
             style={styles.textInput}
           />
 
+          {/* ── Shopper Token ── */}
+          <TextInput
+            mode="outlined"
+            label="Shopper Token (optional)"
+            value={shopperTokenTextInput}
+            onChangeText={setShopperTokenTextInput}
+            inputAccessoryViewID={Platform.OS === 'ios' ? inputAccessoryViewID : undefined}
+            style={styles.textInput}
+          />
+
+          {/* ── Color fields ── */}
+          <ColorPickerField
+            label="Focused Border Color"
+            selected={focusedTextInputBorderColor}
+            onChange={setFocusedBorderColor}
+          />
+          <ColorPickerField
+            label="Unfocused Border Color"
+            selected={unfocusedTextInputBorderColor}
+            onChange={setUnfocusedBorderColor}
+          />
+
+          {/* ── CTA Border Radius ── */}
           <TextInput
             mode="outlined"
             label="CTA Border Radius"
@@ -266,265 +394,157 @@ const EnterTokenScreen = () => {
             style={styles.textInput}
           />
 
-          {/* Success Screen Checkbox */}
-<View style={styles.checkBoxContainer}>
-  <TouchableOpacity
-    onPress={() => setShowSuccessScreen(!showSuccessScreen)}
-  >
-    <View style={[
-      styles.checkboxBox,
-      { borderColor: "#007bff" },
-      showSuccessScreen && { backgroundColor: "#007bff" }
-    ]}>
-      {showSuccessScreen && (
-        <Text style={styles.checkmark}>✓</Text>
-      )}
-    </View>
-  </TouchableOpacity>
-  <Text style={styles.checkBoxText}>
-    Show Success Screen
-  </Text>
-</View>
+          {/* ── Payment Methods ── */}
+          <PaymentMethodsField selected={paymentMethods} onChange={setPaymentMethods} />
 
-{/* Failure Screen Checkbox */}
-<View style={styles.checkBoxContainer}>
-  <TouchableOpacity
-    onPress={() => setShowFailureScreen(!showFailureScreen)}
-  >
-    <View style={[
-      styles.checkboxBox,
-      { borderColor: "#007bff" },
-      showFailureScreen && { backgroundColor: "#007bff" }
-    ]}>
-      {showFailureScreen && (
-        <Text style={styles.checkmark}>✓</Text>
-      )}
-    </View>
-  </TouchableOpacity>
-  <Text style={styles.checkBoxText}>
-    Show Failure Screen
-  </Text>
-</View>
+          {/* ── Font Family ── */}
+          <View style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>Font Family</Text>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => setIsFontDropdownVisible(true)}
+            >
+              <Text style={styles.dropdownButtonText}>{fontFamilyLabel}</Text>
+              <Text style={styles.dropdownChevron}>▾</Text>
+            </TouchableOpacity>
 
-
-<View style={styles.radioContainer}>
-            <Text style={styles.label}>Load Noto Sans Font:</Text>
-            <View style={styles.radioRow}>
-              <TouchableOpacity
-                style={styles.radioOption}
-                onPress={() => handleNotoSansToggle(true)}
-              >
-                <View style={styles.radioOuter}>
-                  {useNotoSans && <View style={styles.radioInner} />}
+            <Modal visible={isFontDropdownVisible} animationType="slide" transparent>
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <FlatList
+                    data={FONT_FAMILY_OPTIONS}
+                    keyExtractor={(item) => item.label}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={styles.dropdownItem}
+                        onPress={() => handleFontFamilySelect(item.value)}
+                      >
+                        <Text style={styles.dropdownItemText}>{item.label}</Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                  <TouchableOpacity
+                    style={styles.modalCloseButton}
+                    onPress={() => setIsFontDropdownVisible(false)}
+                  >
+                    <Text style={styles.modalCloseButtonText}>Close</Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.radioLabel}>Yes</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.radioOption}
-                onPress={() => handleNotoSansToggle(false)}
-              >
-                <View style={styles.radioOuter}>
-                  {!useNotoSans && <View style={styles.radioInner} />}
-                </View>
-                <Text style={styles.radioLabel}>No</Text>
-              </TouchableOpacity>
-            </View>
-            {useNotoSans && (
-  <View style={styles.fontStatusRow}>
-    {isFontLoading ? (
-      <View>
-        <ActivityIndicator size="small" color="#007bff" />
-        <Text style={styles.fontStatus}>  Loading Noto Sans...</Text>
-      </View>
-    ) : fontsLoaded ? (
-      <Text style={styles.fontStatus}>✅ Noto Sans loaded</Text>
-    ) : null}
-  </View>
-)}
+              </View>
+            </Modal>
           </View>
 
-          <Text style={styles.label}>Select Environment:</Text>
-
-          <TouchableOpacity style={styles.dropdownButton} onPress={toggleDropdown}>
-            <Text>
-              {environments.find((env) => env.value === environment)?.label || "Select Environment"}
-            </Text>
-          </TouchableOpacity>
-
-          {/* ── Color pickers ── */}
-          <ColorPickerRow
-            label="Text Input Focused Color:"
-            selected={focusedBorderColor}
-            onSelect={setFocusedBorderColor}
-            isVisible={isFocusedColorDropdownVisible}
-            setVisible={setIsFocusedColorDropdownVisible}
+          {/* ── Toggles ── */}
+          <ToggleRow label="Test Environment" value={isTestEnv} onValueChange={setIsTestEnv} />
+          <ToggleRow
+            label="BoxPay Pay Button Visible (Only eligible in Elements)"
+            value={isBoxPayPayButtonVisible}
+            onValueChange={setIsBoxPayPayButtonVisible}
           />
-          <ColorPickerRow
-            label="Text Input Unfocused Color:"
-            selected={borderColor}
-            onSelect={setBorderColor}
-            isVisible={isUnfocusedColorDropdownVisible}
-            setVisible={setIsUnfocusedColorDropdownVisible}
+          <ToggleRow
+            label="Show Success Screen"
+            value={showSuccessScreen}
+            onValueChange={setShowSuccessScreen}
+          />
+          <ToggleRow
+            label="Show Failed Screen"
+            value={showFailureScreen}
+            onValueChange={setShowFailureScreen}
+          />
+          <ToggleRow label="Show QR On Load" value={showQROnLoad} onValueChange={setShowQROnLoad} />
+          <ToggleRow
+            label="SI CheckBox Enabled"
+            value={isSICheckBoxEnabled}
+            onValueChange={setIsSICheckBoxEnabled}
+          />
+          <ToggleRow
+            label="SI CheckBox Pre-Checked"
+            value={isSICheckBoxChecked}
+            onValueChange={setIsSICheckBoxChecked}
           />
 
-<Text style={styles.label}>SI Checkbox State:</Text>
-
-<TouchableOpacity
-  style={styles.dropdownButton}
-  onPress={() => setIsSIDropdownVisible(true)}
->
-  <Text>{getSILabel(siCheckboxState)}</Text>
-</TouchableOpacity>
-
-<Modal visible={isSIDropdownVisible} animationType="slide" transparent>
-  <View style={styles.modalOverlay}>
-    <View style={styles.modalContent}>
-      <FlatList
-        data={SI_CHECKBOX_OPTIONS}
-        keyExtractor={(item) => item.label}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.dropdownItem}
-            onPress={() => {
-              setSICheckboxState(item.value);
-              setIsSIDropdownVisible(false);
-            }}
+          {/* ── Proceed button ── */}
+          <Pressable
+            disabled={!isProceedEnabled}
+            style={[
+              styles.proceedButton,
+              { backgroundColor: isProceedEnabled ? PRIMARY_GREEN : DISABLED_GREY },
+            ]}
+            onPress={handleProceedPress}
           >
-            <Text>{item.label}</Text>
-          </TouchableOpacity>
-        )}
-      />
-      <Button title="Close" onPress={() => setIsSIDropdownVisible(false)} />
-    </View>
-  </View>
-</Modal>
-          <Pressable style={styles.proceedButton} onPress={handleProceedPress}>
-            <Text style={styles.proceedButtonText}>Proceed</Text>
+            <Text
+              style={[
+                styles.proceedButtonText,
+                { color: isProceedEnabled ? 'white' : DISABLED_TEXT },
+              ]}
+            >
+              Proceed
+            </Text>
           </Pressable>
-
-          <Modal visible={isDropdownVisible} animationType="slide" transparent={true}>
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
-                <FlatList
-                  data={environments}
-                  keyExtractor={(item) => item.value}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.dropdownItem}
-                      onPress={() => selectEnvironment(item.value)}
-                    >
-                      <Text>{item.label}</Text>
-                    </TouchableOpacity>
-                  )}
-                />
-                <Button title="Close" onPress={toggleDropdown} />
-              </View>
-            </View>
-          </Modal>
-          {Platform.OS === 'ios' && (
-          <InputAccessoryView nativeID={inputAccessoryViewID}>
-            <View style={{
-              backgroundColor: '#f1f1f1',
-              padding: 10,
-              alignItems: 'flex-end',
-            }}>
-              <TouchableOpacity onPress={() => Keyboard.dismiss()}>
-                <Text style={{ fontSize: 16 }}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          </InputAccessoryView>
-      )}
-        </View>
         </ScrollView>
       )}
+      <Toast />
     </View>
   );
-
 };
 
 export default EnterTokenScreen;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  buttonText: {
-    fontSize: 20,
-    fontWeight: 'semibold',
-    marginBottom: 14
-  },
-  radioContainer: {
-    width: '100%',
-    marginBottom: 12,
-    paddingTop: 10,
-  },
-  radioRow: {
-    flexDirection: 'row',
-    gap: 24,
-    marginTop: 4,
-  },
   textInput: {
     width: '100%',
     borderRadius: 8,
     backgroundColor: 'white',
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  fontStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
+  fieldContainer: {
+    width: '100%',
+    marginBottom: 12,
   },
-  radioOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#007bff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fontStatus: {
-    fontSize: 12,
-    color: '#555',
-    marginTop: 4,
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#007bff',
-  },
-  radioLabel: {
-    fontSize: 15,
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 5,
-    alignSelf: 'flex-start',
-  },
-  pressableText: {
-    color: 'blue',
-    marginBottom: 10,
-    textDecorationLine: 'underline',
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: LABEL_DARK,
+    marginBottom: 6,
   },
   dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     width: '100%',
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
+    padding: 12,
     backgroundColor: 'white',
-    alignItems: 'flex-start',
+    gap: 10,
+  },
+  dropdownButtonText: {
+    flex: 1,
+    fontSize: 16,
+    color: TEXT_DARK,
+  },
+  dropdownChevron: {
+    fontSize: 14,
+    color: '#555',
+  },
+  colorSwatch: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  toggleLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: LABEL_DARK,
+    marginRight: 12,
   },
   modalOverlay: {
     flex: 1,
@@ -537,59 +557,101 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
     width: '80%',
+    maxHeight: '70%',
+  },
+  colorModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    width: '80%',
+    maxHeight: '65%',
+    padding: 16,
+  },
+  colorModalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
+    color: LABEL_DARK,
+  },
+  colorItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  colorItemSelected: {
+    backgroundColor: '#f0f6ff',
+  },
+  colorItemLabel: {
+    flex: 1,
+    fontSize: 15,
+    color: TEXT_DARK,
+  },
+  colorItemHex: {
+    fontSize: 12,
+    color: '#888',
   },
   dropdownItem: {
-    padding: 10,
+    padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  dropdownItemText: {
+    fontSize: 15,
+    color: TEXT_DARK,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 10,
+  },
+  checkboxBox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderRadius: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkmark: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 'bold',
+    lineHeight: 16,
+  },
+  modalCloseButton: {
+    marginTop: 12,
+    alignSelf: 'flex-end',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  modalCloseButtonText: {
+    color: PRIMARY_GREEN,
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  fontStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  fontStatus: {
+    fontSize: 12,
+    color: '#555',
+  },
   proceedButton: {
     width: '100%',
-    backgroundColor: '#007bff', // Example color
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 12,
+    marginBottom: 24,
   },
   proceedButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  checkBoxContainer : {
-    flexDirection: 'row',
-    marginTop: 10,
-    alignItems: 'center'
-},
-checkboxBox: {
-  width: 20,
-  height: 20,
-  borderWidth: 2,
-  borderRadius: 3,
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-checkmark: {
-  color: '#fff',
-  fontSize: 13,
-  fontWeight: 'bold',
-  lineHeight: 16,
-},
-checkBoxText : {
-  color: '#2D2B32',
-  fontSize: 14,
-  marginLeft: 6,
-},
-colorPickerContainer:  { width: '100%', marginBottom: 12 },
-  colorDropdownButton:   { flexDirection: 'row', alignItems: 'center', width: '100%', borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, backgroundColor: 'white', gap: 10 },
-  colorDropdownText:     { flex: 1, fontSize: 15 },
-  dropdownChevron:       { fontSize: 14, color: '#555' },
-  colorSwatch:           { width: 22, height: 22, borderRadius: 4 },
-  colorModalContent:     { backgroundColor: 'white', borderRadius: 12, width: '80%', maxHeight: '60%', padding: 16 },
-  colorModalTitle:       { fontSize: 16, fontWeight: '600', marginBottom: 10 },
-  colorItem:             { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4, gap: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  colorItemSelected:     { backgroundColor: '#f0f6ff' },
-  colorItemLabel:        { flex: 1, fontSize: 15 },
-  colorItemCheck:        { fontSize: 16, color: '#007bff', fontWeight: 'bold' },
-
 });

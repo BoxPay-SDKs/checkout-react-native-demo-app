@@ -42,7 +42,18 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0"
+          }
+        }
+      ],
+      "./plugins/withAndroidGradlePlugin"
     ],
     "experiments": {
       "typedRoutes": true
