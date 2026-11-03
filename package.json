@@ -18,7 +18,7 @@
     "@react-navigation/native-stack": "^7.3.10",
     "axios": "^1.11.0",
     "base-64": "^1.0.0",
-    "boxpay-checkout-reactnative-sdk": "2.0.2-beta3",
+    "boxpay-checkout-reactnative-sdk": "file:../checkout-react-native-sdk",
     "currency-symbol-map": "^5.1.0",
     "expo": "^54.0.0",
     "expo-asset": "~12.0.13",

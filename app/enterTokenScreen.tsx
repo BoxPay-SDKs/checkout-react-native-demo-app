@@ -1,11 +1,11 @@
-import { BoxpayCheckout } from 'boxpay-checkout-reactnative-sdk';
+import { BoxpayCheckout, BoxpayElements, BoxpayElementsHandle } from 'boxpay-checkout-reactnative-sdk';
 import {
   ConfigurationOptions,
   PaymentResultObject,
   SICheckboxState,
   UIConfigurationOptions,
 } from 'boxpay-checkout-reactnative-sdk/interface';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Modal,
@@ -34,6 +34,9 @@ const PRESET_COLORS: { label: string; value: string | null }[] = [
   { label: 'Purple', value: '#7B1FA2' },
 ];
 
+// Sentinel value that means "use BoxpayCheckout with all methods"
+const ALL_METHODS_SENTINEL = '__ALL__';
+
 const PAYMENT_METHODS = ['UPI', 'CARDS', 'WALLET', 'NETBANKING', 'BUYNOWPAYLATER', 'EMI'];
 
 const FONT_FAMILY_OPTIONS: { label: string; value: string }[] = [
@@ -51,7 +54,8 @@ const LABEL_DARK = '#2D2B32';
 
 const inputAccessoryViewID = 'checkoutDetailsNumberID';
 
-// ── Reusable UI pieces ────────────────────────────────────────────────────────
+const elementsRef = useRef<BoxpayElementsHandle>(null);
+const [isPayable, setIsPayable] = useState(false);
 
 const ToggleRow = ({
   label,
@@ -164,6 +168,10 @@ const ColorPickerField = ({
   );
 };
 
+// ── Payment Methods picker ────────────────────────────────────────────────────
+// • Selecting "All Payment Methods (Checkout)" clears the set → BoxpayCheckout
+// • Selecting any specific method(s) adds them → BoxpayElements
+
 const PaymentMethodsField = ({
   selected,
   onChange,
@@ -173,10 +181,17 @@ const PaymentMethodsField = ({
 }) => {
   const [isVisible, setIsVisible] = useState(false);
 
-  const displayText =
-    selected.size === 0 ? 'All Payment Methods (Checkout)' : Array.from(selected).join(', ');
+  const isAllMethods = selected.size === 0;
+  const displayText = isAllMethods
+    ? 'All Payment Methods (Checkout)'
+    : Array.from(selected).join(', ');
 
   const toggleMethod = (method: string) => {
+    if (method === ALL_METHODS_SENTINEL) {
+      // Deselect everything → fall back to BoxpayCheckout
+      onChange(new Set());
+      return;
+    }
     const updated = new Set(selected);
     if (updated.has(method)) {
       updated.delete(method);
@@ -185,6 +200,12 @@ const PaymentMethodsField = ({
     }
     onChange(updated);
   };
+
+  // Build list: "All" sentinel first, then specific methods
+  const listData = [
+    { key: ALL_METHODS_SENTINEL, label: 'All Payment Methods (Checkout)' },
+    ...PAYMENT_METHODS.map((m) => ({ key: m, label: m })),
+  ];
 
   return (
     <View style={styles.fieldContainer}>
@@ -200,23 +221,43 @@ const PaymentMethodsField = ({
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <FlatList
-              data={PAYMENT_METHODS}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => {
-                const isSelected = selected.has(item);
+              data={listData}
+              keyExtractor={(item) => item.key}
+              renderItem={({ item, index }) => {
+                const isAllRow = item.key === ALL_METHODS_SENTINEL;
+                const isSelected = isAllRow ? isAllMethods : selected.has(item.key);
+
                 return (
-                  <TouchableOpacity style={styles.checkboxRow} onPress={() => toggleMethod(item)}>
-                    <View
-                      style={[
-                        styles.checkboxBox,
-                        { borderColor: PRIMARY_GREEN },
-                        isSelected && { backgroundColor: PRIMARY_GREEN },
-                      ]}
+                  <View>
+                    {/* Divider after the "All" row */}
+                    {index === 1 && <View style={styles.methodDivider} />}
+                    <TouchableOpacity
+                      style={styles.checkboxRow}
+                      onPress={() => {
+                        toggleMethod(item.key);
+                        // Close automatically when "All" is chosen
+                        if (isAllRow) setIsVisible(false);
+                      }}
                     >
-                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                    </View>
-                    <Text style={styles.dropdownItemText}>{item}</Text>
-                  </TouchableOpacity>
+                      <View
+                        style={[
+                          styles.checkboxBox,
+                          { borderColor: PRIMARY_GREEN },
+                          isSelected && { backgroundColor: PRIMARY_GREEN },
+                        ]}
+                      >
+                        {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                      </View>
+                      <Text
+                        style={[
+                          styles.dropdownItemText,
+                          isAllRow && styles.allMethodsLabel,
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 );
               }}
             />
@@ -246,7 +287,7 @@ const EnterTokenScreen = () => {
   // CTA border radius
   const [ctaBorderRadius, setCtaBorderRadius] = useState('0');
 
-  // Payment methods
+  // Payment methods — empty set means "all" (BoxpayCheckout)
   const [paymentMethods, setPaymentMethods] = useState<Set<string>>(new Set());
 
   // Font family
@@ -262,8 +303,7 @@ const EnterTokenScreen = () => {
   const [isSICheckBoxEnabled, setIsSICheckBoxEnabled] = useState(false);
   const [isSICheckBoxChecked, setIsSICheckBoxChecked] = useState(false);
 
-
-  const handleFontFamilySelect = async (value: string) => {
+  const handleFontFamilySelect = (value: string) => {
     setFontFamily(value);
     setIsFontDropdownVisible(false);
   };
@@ -277,14 +317,14 @@ const EnterTokenScreen = () => {
   const handlePaymentResult = useCallback(
     (result: PaymentResultObject) => {
       console.log('Payment Result:', result);
-  
+
       // Close first — this must always happen, independent of anything below
       setToken(null);
-  
+
       try {
         const status = typeof result?.status === 'string' ? result.status : String(result?.status ?? '');
         const transactionId = result?.transactionId ?? '';
-  
+
         Toast.show({
           type: status.toLowerCase() === 'success' ? 'success' : 'error',
           text1: `Payment ${status}`,
@@ -299,8 +339,7 @@ const EnterTokenScreen = () => {
     [],
   );
 
-  // Map the two SI booleans (enabled / pre-checked) onto the SDK's SICheckboxState enum,
-  // the same way TokenScreen.kt derives its four states.
+  // Map the two SI booleans onto the SDK's SICheckboxState enum
   const siCheckboxState = useMemo<SICheckboxState | null>(() => {
     if (isSICheckBoxEnabled && isSICheckBoxChecked) return SICheckboxState.CHECKED_AND_ENABLED;
     if (isSICheckBoxEnabled && !isSICheckBoxChecked) return SICheckboxState.UNCHECKED_AND_ENABLED;
@@ -309,45 +348,90 @@ const EnterTokenScreen = () => {
   }, [isSICheckBoxEnabled, isSICheckBoxChecked]);
 
   const textInputFields =
-  focusedTextInputBorderColor || unfocusedTextInputBorderColor
+    focusedTextInputBorderColor || unfocusedTextInputBorderColor
       ? {
           ...(focusedTextInputBorderColor && { focusedTextInputBorderColor }),
           ...(unfocusedTextInputBorderColor && { borderColor: unfocusedTextInputBorderColor }),
         }
       : null;
 
+  const configurationOptions = {
+    [ConfigurationOptions.ShowBoxpaySuccessScreen]: showSuccessScreen,
+    [ConfigurationOptions.EnableSandboxEnv]: isTestEnv,
+    [ConfigurationOptions.SICheckBoxState]: siCheckboxState,
+    [ConfigurationOptions.ShowBoxpayFailedScreen]: showFailureScreen,
+    [ConfigurationOptions.ShowBoxPayProceedButton] : true
+  };
+
+  const uiConfiguration = {
+    [UIConfigurationOptions.FontFamily]: fontFamily,
+    [UIConfigurationOptions.CTABorderRadius]: Number(ctaBorderRadius) || 0,
+    ...(textInputFields && {
+      [UIConfigurationOptions.TextInputFields]: textInputFields,
+    }),
+  };
+
   const fontFamilyLabel =
     FONT_FAMILY_OPTIONS.find((f) => f.value === fontFamily)?.label ?? 'None';
 
   const isProceedEnabled = tokenTextInput.trim().length > 0;
 
+  // true  → specific methods chosen → BoxpayElements
+  // false → empty set              → BoxpayCheckout
+  const useElements = paymentMethods.size > 0;
+
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
       {token ? (
-        <View style={{ flex: 1 , paddingTop :170}}>
-           <BoxpayCheckout
-            key={token}
-            token={token}
-            configurationOptions={{
-              [ConfigurationOptions.ShowBoxpaySuccessScreen]: showSuccessScreen,
-              [ConfigurationOptions.EnableSandboxEnv]: isTestEnv,
-              [ConfigurationOptions.SICheckBoxState]: siCheckboxState,
-              [ConfigurationOptions.ShowBoxpayFailedScreen]: showFailureScreen,
-            }}
-            uiConfiguration={{
-              [UIConfigurationOptions.FontFamily]: fontFamily,
-              [UIConfigurationOptions.CTABorderRadius]: Number(ctaBorderRadius) || 0,
-              ...(textInputFields && {
-                [UIConfigurationOptions.TextInputFields]: textInputFields,
-              }),
-            }}
-            onPaymentResult={handlePaymentResult}
-            shopperToken={shopperToken}
-          />
-        </View>
-      ) : (
+  <View style={{ flex: 1, paddingTop: 32 }}>
+    {useElements ? (
+      <View>
+        {/* Elements fills all space above the button */}
+        <BoxpayElements
+          ref={elementsRef}
+          key={token}
+          token={token}
+          configurationOptions={configurationOptions}
+          uiConfiguration={uiConfiguration}
+          onPaymentResult={handlePaymentResult}
+          shopperToken={shopperToken}
+          paymentMethodList={Array.from(paymentMethods)}
+          onPayableChanged={setIsPayable}
+        />
+
+        {/* PAY button — only when SDK's own button is hidden */}
+        {!isBoxPayPayButtonVisible && (
+          <Pressable
+            disabled={!isPayable}
+            style={[
+              styles.payButton,
+              { backgroundColor: isPayable ? PRIMARY_GREEN : DISABLED_GREY },
+            ]}
+            onPress={() => elementsRef.current?.pay()}
+          >
+            <Text style={[
+              styles.payButtonText,
+              { color: isPayable ? 'white' : DISABLED_TEXT },
+            ]}>
+              PAY
+            </Text>
+          </Pressable>
+        )}
+      </View>
+    ) : (
+      <BoxpayCheckout
+        key={token}
+        token={token}
+        configurationOptions={configurationOptions}
+        uiConfiguration={uiConfiguration}
+        onPaymentResult={handlePaymentResult}
+        shopperToken={shopperToken}
+      />
+    )}
+  </View>
+)  : (
         <ScrollView
-          style={{ flex: 1, }}
+          style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 40, paddingTop: 70, paddingHorizontal: 16 }}
           keyboardShouldPersistTaps="handled"
         >
@@ -602,6 +686,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: TEXT_DARK,
   },
+  allMethodsLabel: {
+    fontWeight: '600',
+    color: PRIMARY_GREEN,
+  },
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -622,6 +710,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     lineHeight: 16,
   },
+  methodDivider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 4,
+  },
   modalCloseButton: {
     marginTop: 12,
     alignSelf: 'flex-end',
@@ -637,6 +730,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
+  },
+  payButton: {
+    marginHorizontal: 16,
+    marginBottom: 24,
+    marginTop: 8,
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  payButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   fontStatus: {
     fontSize: 12,
